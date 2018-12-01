@@ -15,7 +15,8 @@ output:
 
 <br>
 
-```{r setup, message = FALSE, warning = FALSE, results = "hide"}
+
+```r
 ## Set all chunks to show code. Manually set figures path.
 knitr::opts_chunk$set(echo = TRUE, 
                       fig.path = "./figures/")
@@ -38,7 +39,8 @@ library(ggplot2)
 
 We begin with a code chunk for downloading the provided data file and unzipping it. We include it for completeness. Per the project instructions, we can assume that the data file has already been appropriately downloaded and extracted to the same directory as this `.Rmd` file. As such, we'll set the chunk option `eval = FALSE` for this chunk so that it isn't evaluated upon knitting.
 
-```{r download-data, eval = FALSE, results = "hide"}
+
+```r
 download.file(url = "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", 
               destfile = "./activity.zip", 
               method = "curl")
@@ -48,7 +50,8 @@ unzip(zipfile = "./activity.zip",
 
 Now we'll read the data in. Just to try something new, we made use of the function `read_csv()` from the package `readr`. We specify to read the second and third columns of the data, `date` and `interval`, as character strings for easier processing in the next code chunk.
 
-```{r load-data}
+
+```r
 activity <- read_csv(file = "../data/activity.csv", 
                      col_types = "icc", 
                      n_max = 17659)
@@ -60,14 +63,16 @@ activity <- read_csv(file = "../data/activity.csv",
 
 Upon examining the `interval` column of the data, we note that times are not expressed with leading zeros when needed (i.e. the time `0005`, which corresponds to `00:05` or `12:05 AM` depending on locale, is stored as `5`). So before we continue, we'll use `str_pad()` from the package `stringr` to add leading zeros as needed to the `interval` variable so that it is handled correctly when we convert these character strings to date/time objects.
 
-```{r process-interval}
+
+```r
 activity <- activity %>% 
     mutate(interval = str_pad(interval, 4, "left", "0"))
 ```
 
 Now, the `date` and `interval` variables comprise a valid date and time. So, we `paste()` these variables together, then use the `lubridate` package to convert them from character strings to `POSIXct` date/time objects. We take these dates and times to be the *beginning* of each five-minute interval for which we have counts of steps. To help our conceptual understanding of the data, we'll also add a second date/time column that represents the *end* of each five-minute interval. Finally, we'll remove the `date` and `interval` columns since they're no longer necessary.
 
-```{r convert-strings-to-datetimes}
+
+```r
 activity <- activity %>% 
     mutate(int_start = ymd_hm(paste(date, interval)), 
            int_end = int_start + dminutes(5)) %>% 
@@ -76,7 +81,8 @@ activity <- activity %>%
 
 As our final processing task, we'll use some various `lubridate` functions to extract items of interest from the new date/time objects. These will help for later tasks and give us additional variables by which we can filter or group as necessary.
 
-```{r extract-datetime-components}
+
+```r
 activity <- activity %>% 
     mutate(date = date(int_start), 
            year = year(int_start), 
@@ -99,21 +105,34 @@ For this part of the assignment, we ignore missing values.
 
 Since we can ignore missing values for now, we'll begin by constructing a reduced data set that has missing values removed.
 
-```{r remove-missing-values}
+
+```r
 activity_narm <- activity %>% 
     filter(!is.na(steps))
 ```
 
 Next, we'll create a summary data frame whose purpose is to find the sum of the number of steps taken on each day. Since the resulting table has 53 rows, we'll just print out a few of them to demonstrate the result.
 
-```{r daily-step-total, results = "asis"}
+
+```r
 activity_daily_steps <- activity_narm %>% 
     group_by(date) %>% 
     summarize(daily_total = sum(steps))
 knitr::kable(head(activity_daily_steps))
 ```
 
-From this table, we can see that the first day, `r activity_daily_steps$date[1]`, has an unusually low number of steps, `r activity_daily_steps$daily_total[1]`. But then the next few days in the table appear to have more consistent numbers of steps.
+
+
+date          daily_total
+-----------  ------------
+2012-10-02            126
+2012-10-03          11352
+2012-10-04          12116
+2012-10-05          13294
+2012-10-06          15420
+2012-10-07          11015
+
+From this table, we can see that the first day, 2012-10-02, has an unusually low number of steps, 126. But then the next few days in the table appear to have more consistent numbers of steps.
 
 <br>
 
@@ -121,12 +140,15 @@ From this table, we can see that the first day, `r activity_daily_steps$date[1]`
 
 We'll use `ggplot2` to construct a histogram of these daily step counts.
 
-```{r daily-step-histogram, fig.height = 3, fig.width = 5}
+
+```r
 ggplot(data = activity_daily_steps) + 
     geom_histogram(mapping = aes(x = daily_total), bins = 30, 
                    color = "black", fill = "forestgreen") + 
     labs(x = "Daily Total Steps", y = "Frequency")
 ```
+
+![](./figures/daily-step-histogram-1.png)<!-- -->
 
 The histogram shows a few values near zero, and there are several values scattered between about 2000 and 10000. There is a spike of values around 10000, and the majority of step counts fall between 10000 and about 16000. Two values appear that are greater than 20000.
 
@@ -136,14 +158,21 @@ The histogram shows a few values near zero, and there are several values scatter
 
 For calculating the mean and median, we'll make use of `summary()` in the package `dplyr`.
 
-```{r daily-step-summary, results = "asis"}
+
+```r
 daily_steps_summary <- activity_daily_steps %>% 
     summarize(mean_daily_total = mean(daily_total), 
               median_daily_total = median(daily_total))
 knitr::kable(daily_steps_summary)
 ```
 
-From this table, we see that the mean of the daily step totals is `r format(round(daily_steps_summary$mean_daily_total[1], 2), scientific = FALSE)` and the median of the daily step totals is `r format(daily_steps_summary$median_daily_total[1], scientific = FALSE)`. It's noteworthy that the mean and median values are so close to each other.
+
+
+ mean_daily_total   median_daily_total
+-----------------  -------------------
+         10766.19                10765
+
+From this table, we see that the mean of the daily step totals is 10766.19 and the median of the daily step totals is 10765. It's noteworthy that the mean and median values are so close to each other.
 
 * * *
 
@@ -157,7 +186,8 @@ For this part of the assignment, we ignore missing values.
 
 Before we get to the plot, we'll create another summary data frame in which we calculate the mean number of steps recorded for each five-minute interval in the data.
 
-```{r average-across-intervals}
+
+```r
 activity_mean_steps_interval <- activity_narm %>% 
     group_by(hour, minute) %>% 
     summarize(mean_steps_interval = mean(steps))
@@ -165,13 +195,16 @@ activity_mean_steps_interval <- activity_narm %>%
 
 Now we'll make our time series plot. To avoid the horizontal axis being considered character strings, we'll compute the intervals as a number of hours from the start of the day (i.e. the time `12:30` would be calculated as `12.5`).
 
-```{r time-series-mean-steps, fig.height = 3, fig.width = 5}
+
+```r
 ggplot(data = activity_mean_steps_interval) + 
     geom_line(mapping = aes(x = hour + (minute / 60), 
                             y = mean_steps_interval)) + 
     labs(x = "Start of Five-Minute Interval (hours)", 
          y = "Mean Number of Steps")
 ```
+
+![](./figures/time-series-mean-steps-1.png)<!-- -->
 
 In this plot, we see that the largest peak in the mean number of steps occurs around 8:30. There are a few smaller peaks at other times in the day, such as around 12:30, around 16:00, and around 18:30.
 
@@ -181,7 +214,8 @@ In this plot, we see that the largest peak in the mean number of steps occurs ar
 
 For this question, we'll again use `dplyr` functions. This time we'll `arrange()` the data according to the mean number of steps, then convert the times to be more human-readable by placing the `hour` and `minute` values inside a character string.
 
-```{r interval-with-greatest-steps}
+
+```r
 mean_steps_by_interval <- activity_mean_steps_interval %>% 
     ungroup() %>% 
     arrange(desc(mean_steps_interval)) %>% 
@@ -190,7 +224,13 @@ mean_steps_by_interval <- activity_mean_steps_interval %>%
 knitr::kable(head(mean_steps_by_interval, 1))
 ```
 
-This table tells us that the five-minute interval with the greatest mean number of steps is the interval starting at `r mean_steps_by_interval$time[1]`, with a mean number of steps of approximately `r round(mean_steps_by_interval$mean_steps_interval[1], 2)`.
+
+
+time    mean_steps_interval
+-----  --------------------
+8:35               206.1698
+
+This table tells us that the five-minute interval with the greatest mean number of steps is the interval starting at 8:35, with a mean number of steps of approximately 206.17.
 
 * * *
 
@@ -204,14 +244,19 @@ For this part of the assignment, we directly address missing values.
 
 To count the number of missing values, we'll `filter()` according to missing values, then count the rows in the result with `nrow()`.
 
-```{r count-missing-values}
+
+```r
 num_missing <- activity %>% 
     filter(is.na(steps)) %>% 
     nrow()
 num_missing
 ```
 
-This result tells us that there are `r num_missing` missing values in the data.
+```
+## [1] 2304
+```
+
+This result tells us that there are 2304 missing values in the data.
 
 <br>
 
@@ -227,7 +272,8 @@ For each missing value, we'll calculate the average of non-missing values in the
 
 To create the new dataset, we'll calculate the mean of all non-missing values for each five-minute interval and each day of the week. Then we'll create a new column to which we assign either the number of steps in the original data (if that value is not missing) or the calculated mean of non-missing values (if the value in question is missing).
 
-```{r create-imputed-dataset}
+
+```r
 activity_imputed <- activity %>% 
     group_by(day_of_week, hour, minute) %>% 
     mutate(mean_narm = mean(steps, na.rm = TRUE), 
@@ -241,7 +287,8 @@ activity_imputed <- activity %>%
 
 To create our histogram, we'll follow a similar procedure to that which we followed in creating our earlier histogram. This time, using the new dataset, we'll calculate the sum of the step counts for each day in the data, and we'll pass the resulting data frame to `ggplot()` for creating the histogram.
 
-```{r imputed-daily-step-histogram, fig.height = 3, fig.width = 5}
+
+```r
 activity_imputed_daily <- activity_imputed %>% 
     group_by(date) %>% 
     summarize(daily_total = sum(imputed_steps))
@@ -251,18 +298,27 @@ ggplot(data = activity_imputed_daily) +
     labs(x = "Daily Total Steps (includes imputation)", y = "Frequency")
 ```
 
+![](./figures/imputed-daily-step-histogram-1.png)<!-- -->
+
 The imputation of missing values has not had a major effect on the structure of the histogram. As before, we see some values below 10000, then a spike of values at 10000, and the majority of the values lie between 10000 and 16000.
 
 Now we'll calculate the mean and median of the new dataset for comparison to the original dataset.
 
-```{r inputed-daily-step-summary, results = "asis"}
+
+```r
 imputed_daily_steps_summary <- activity_imputed_daily %>% 
     summarize(mean_daily_total = mean(daily_total), 
               median_daily_total = median(daily_total))
 knitr::kable(imputed_daily_steps_summary)
 ```
 
-We do see some movement in the mean and median of the daily step counts after imputing the missing values. The mean number of steps per day has increased to `r format(round(imputed_daily_steps_summary$mean_daily_total[1], 2), scientific = FALSE)` while the median number of steps per day has increased to `r format(imputed_daily_steps_summary$median_daily_total[1], scientific = FALSE)`. Also of interest is that the difference between the mean and median increased, which suggests that the distribution of the daily step totals is slightly more skewed in the dataset with missing step counts imputed than in the original data set.
+
+
+ mean_daily_total   median_daily_total
+-----------------  -------------------
+         10821.21                11015
+
+We do see some movement in the mean and median of the daily step counts after imputing the missing values. The mean number of steps per day has increased to 10821.21 while the median number of steps per day has increased to 11015. Also of interest is that the difference between the mean and median increased, which suggests that the distribution of the daily step totals is slightly more skewed in the dataset with missing step counts imputed than in the original data set.
 
 * * *
 
@@ -276,7 +332,8 @@ For this part of the assignment, we use imputed values in place of missing value
 
 To create our new variable, we'll make use of the `day_of_week` variable that we already created during the data processing stage. We'll check its value and assign the new variable values of `"Weekday"` or `"Weekend"` accordingly.
 
-```{r assign-weekend-weekday}
+
+```r
 activity_imputed <- activity_imputed %>% 
     mutate(day_type = factor(ifelse(day_of_week %in% c("Sat", "Sun"), 
                                     "Weekend", "Weekday")))
@@ -288,7 +345,8 @@ activity_imputed <- activity_imputed %>%
 
 As before, we'll first create a summary data frame to be used in our time series plot. This will calculate the mean number of steps in the new dataset for each five-minute interval and each type of day. To create our time series plot, our basic plot will have a similar structure to the one we created earlier, where we converted times to be expressed as numbers of hours from the beginning of the day. To create this panel plot, we'll use `facet_wrap()` from `ggplot2` and specify to place the panels in one column, as was shown in the example figure.
 
-```{r paneled-time-series-mean-steps, fig.height = 3.5, fig.width = 5}
+
+```r
 activity_imputed_weekday <- activity_imputed %>% 
     group_by(day_type, hour, minute) %>% 
     summarize(mean_imputed_steps = mean(imputed_steps))
@@ -298,5 +356,7 @@ ggplot(data = activity_imputed_weekday) +
     labs(x = "Start of Five-Minute Interval (hours)", 
          y = "Mean Number of Steps (includes imputation)")
 ```
+
+![](./figures/paneled-time-series-mean-steps-1.png)<!-- -->
 
 There are some interesting features shown in this plot. Both plots have peaks around 8:30, though the weekday plot's peak is much higher. Further, this 8:30 peak is significantly higher than any other peaks in the weekday plot, while the 8:30 peak in the weekend plot is roughly similar in height to a peak at around 9:00, a peak near 12:00, and a peak near 16:30. These plots would seem to demonstrate the pattern of someone that works in an office during regular weekdays: the morning pattern might be the commute, or just arriving and settling in at work, while the relatively low step counts otherwise represent being more stationary while working. The weekend plot is less concentrated, and shows more activity at different times during the day.
